@@ -1,7 +1,8 @@
 package com.example.trackr;
 
+import android.os.StrictMode;
+import android.util.Log;
 import android.view.View;
-import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesClient;
 import com.google.android.gms.common.GooglePlayServicesUtil;
@@ -17,7 +18,18 @@ import android.app.Activity;
 import android.location.Location;
 import android.os.Bundle;
 import android.widget.TextView;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.*;
 
 
@@ -38,11 +50,11 @@ public class MapActivity extends Activity implements
     private LocationRequest myLocationRequest;
 
     private Polyline myPolyline;
-
+    private Polyline myPolyline2;
     private int markerPos;
-
+    private HashMap<String,String> list;
     LinkedHashMap<String,LatLng> points;
-
+    private static final String LOG_TAG = "MapActivity";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,7 +65,11 @@ public class MapActivity extends Activity implements
         myMap.setOnMarkerClickListener(this);
         myMap.setOnMarkerDragListener(this);
 
-        myPolyline = myMap.addPolyline( new PolylineOptions() );
+        myPolyline = myMap.addPolyline( new PolylineOptions()
+                                            .color(0x770000FF));
+
+        myPolyline2 = myMap.addPolyline( new PolylineOptions()
+                                             .color(0x7700FF00));
         points = new LinkedHashMap<String, LatLng>();
 
         latitute = (TextView) findViewById(R.id.latitute);
@@ -67,6 +83,12 @@ public class MapActivity extends Activity implements
             myLocationClient = new LocationClient(this, this, this);
             myLocationClient.connect();
         }
+
+        // Prevent Crash from accessing Http request
+        // This is a bad method
+        StrictMode.ThreadPolicy policy = new StrictMode.
+                ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
     }
 
     @Override
@@ -131,7 +153,11 @@ public class MapActivity extends Activity implements
     }
 
     public void onClick_draw(View v) {
-        String path = "whueFj_zbVdBhAzAEvCBxSa@lX]jNYfB\\`A~CnFtOb@`Gj@vvEMto@eLnw@kUzsAcGjl@lA`X`F`ZhEjLrO|UzX~b@reAl_BhOvb@`L~cCV~oI`Bt\\rGb~@l@bcBtDtWrXx~@`r@p{Bfq@vzBlDrYSni@uMlgFsA|i@hAzi@fDjnAfEreAhNt`BhEpjAfPhhBjGtb@fOdSfMtIhG|IfGdUtAvYzLzc@~P`f@tKnb@nCv\\oFhXmLbYgBnc@xNjoAxMjbApc@luAro@`sBtC|R`@xUgA|mBnLdsA`C|i@t@ng@}Etb@yA`WmChFOpDxDrEpHdJjG~FdDzAbg@lApLj@do@aBncAMbxAvAva@s@pR}GnVgVtJaF|LgBbK^zGrG~HrHlLp@lMIpHlCxStZhMjJbWtIxSbX~X`g@`Ohd@lFrJlN~q@rNxt@bIjQtNnS~DxQ~Evk@~H~f@nD|G~HlDxR`@nYtKf^~OzTpXpHdZrKjVto@dvAvQxU|Kv_@fF~LrObN~j@lYn\\zE~_@nb@di@doArXfg@tMjGnNeAxMoKrc@kY|m@gZxL{Gp`@mb@tOeP`FmCbLkBdVxVvHzKhPvNdF`L~EpEpLCj_@wSxiBgt@j^wGnh@eGn|A{O`VoCvJoDjRuGz|@gTxpAeVvzDik@t^iCdK~BdKpGj]n]vWvWrr@tdAdQbRvw@dhAlPpNxHfArb@Uje@sAviAbAla@GtNqCvPgHfXoJ|KClHrB`KnInSrYnLlKz_@lIbr@xLri@r[fShNpq@t[|NtJtXf[fMhJx_Ab_@dJnFh\\vf@rRf`@|KpIjJeAzIs@nH|GxGhCpImArEn@nLnIlm@|Hp`@`EhEaAlUqMlHq@zNtExl@fWhGsB`LmQ|M{NzGoC~UcFnE~FdB~G`CnAlDUdCkCAkJaAqJhIoKzJmMxCmAtHnB~GlOhDh@jH}BhHZ~IdIzJ|FbDwBdCsJbGcDbQpBxEo@rKyCpMNdIcGdNsO~[k\\fIaLtPmCpF|EvGpK~JeDjJzBbDKlEsDlCq@dE`BtJpFvS~DnEqBlEiHrGU|HpLdJt@zN_KjGsAhPvLxJrF`ES|IkDjJvCvDjB`FGzPwKtFUbEzArUr\\pDbWvGpLhd@xe@rZho@nGzH~SpJbs@n\\nj@|]lj@bSpKhRdKfFn^`FnRtQ|Qn@vPrDxLAjQ_NvVoOxSiHt\\aBvPpDbKiAvO{JhH_@nFpBfXhTnOjLhGvZ~HhLtKvBdXgBzH_BjBq@`Cg@bAz@nFdBK{E{Ef@qAJ";
+        getJson();
+    }
+
+    List<LatLng> cord = new ArrayList<LatLng>();
+    public void deCodePath(String path) {
         List<Double> list = new ArrayList<Double>();
         for(String a : path.split("(?<=[\\x00-\\x5E])")) {
             int point = 0;
@@ -141,15 +167,11 @@ public class MapActivity extends Activity implements
             list.add((double)(((point & 0x01) == 1) ? ~(point >> 1): (point >> 1)) / 100000);
         }
 
-        List<LatLng> cord = new ArrayList<LatLng>();
+        //List<LatLng> cord = new ArrayList<LatLng>();
         double latBase = 0, longBase = 0;
         for(int index = 0; index < list.size(); ++index) {
             cord.add(new LatLng(latBase += list.get(index), longBase += list.get(++index)));
-
         }
-        myPolyline.setPoints(cord);
-
-
     }
 
     @Override
@@ -166,5 +188,57 @@ public class MapActivity extends Activity implements
     public void onMarkerDragEnd(Marker marker) {
         points.put(marker.getId(), marker.getPosition());
         myPolyline.setPoints(new ArrayList<LatLng>(points.values()));
+    }
+
+
+    public void getJson() {
+        String sJson;
+        list = new HashMap<String, String>();
+        try {
+            // Connect to website
+            HttpClient client = new DefaultHttpClient();
+            HttpGet get = new HttpGet("http://maps.googleapis.com/maps/api/directions/json?origin=Manteca,CA&destination=1065%20High%20St,Santa%20Cruz,CA&sensor=false");
+            HttpResponse response = client.execute(get);
+            HttpEntity entity = response.getEntity();
+
+            // Set input stream and read one line
+            BufferedReader input = new BufferedReader(new InputStreamReader(entity.getContent()));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while((line = input.readLine()) != null) {
+                sb.append(line);
+            }
+            input.close();
+            sJson = sb.toString();
+
+            // Parse Json string
+            JSONObject object = new JSONObject(sJson);
+            JSONArray routes = object.getJSONArray("routes");
+            JSONObject route = routes.getJSONObject(0);
+
+            JSONArray legs = route.getJSONArray("legs");
+            JSONObject leg = legs.getJSONObject(0);
+            JSONArray steps = leg.getJSONArray("steps");
+
+            for (int index = 0; index < steps.length(); ++index) {
+                JSONObject step = steps.getJSONObject(index);
+                JSONObject polyline = step.getJSONObject("polyline");
+                if (polyline.has("points")) {
+                    deCodePath(polyline.getString("points"));
+                }
+            }
+
+            myPolyline.setPoints(cord);
+            cord.clear();
+
+            JSONObject o_polyline = route.getJSONObject("overview_polyline");
+            deCodePath(o_polyline.getString("points"));
+            myPolyline2.setPoints(cord);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 }
